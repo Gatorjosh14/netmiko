@@ -76,7 +76,9 @@ from netmiko.terminal_server import TerminalServerSSH
 from netmiko.terminal_server import TerminalServerTelnet
 from netmiko.ubiquiti import UbiquitiEdgeSSH
 from netmiko.vyos import VyOSSSH
-
+from netmiko.audiocode import AudiocodeSSH
+from netmiko.audiocode import AudiocodeTelnet
+from netmiko.audiocode import AudiocodeOldCLI
 
 # The keys of this dictionary are the supported device_types
 CLASS_MAPPER_BASE = {
@@ -165,6 +167,7 @@ CLASS_MAPPER_BASE = {
     "ubiquiti_edgeswitch": UbiquitiEdgeSSH,
     "vyatta_vyos": VyOSSSH,
     "vyos": VyOSSSH,
+	"audiocode" : AudiocodeSSH						   
 }
 
 FILE_TRANSFER_MAP = {
@@ -220,6 +223,8 @@ CLASS_MAPPER["oneaccess_oneos_telnet"] = OneaccessOneOSTelnet
 CLASS_MAPPER["rad_etx_telnet"] = RadETXTelnet
 CLASS_MAPPER["ruckus_fastiron_telnet"] = RuckusFastironTelnet
 CLASS_MAPPER["ruijie_os_telnet"] = RuijieOSTelnet
+CLASS_MAPPER["audiocode_telnet"] = AudiocodeTelnet
+CLASS_MAPPER["audiocode_old_cli"] = AudiocodeOldCLI											   
 
 # Add serial drivers
 CLASS_MAPPER["cisco_ios_serial"] = CiscoIosSerial
