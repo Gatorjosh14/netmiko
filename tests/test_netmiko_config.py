@@ -61,6 +61,12 @@ def test_command_set(net_connect, commands, expected_responses):
         assert config_commands[0] in config_commands_output
 
     net_connect.send_config_set(config_commands)
+	
+    if 'audiocode' in net_connect.device_type:
+       net_connect.send_config_set(config_commands, config_mode_command="config system")
+    else:
+        net_connect.send_config_set(config_commands)
+		
     if support_commit:
         net_connect.commit()
 
