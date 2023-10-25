@@ -3,6 +3,14 @@ import time
 import re
 from netmiko.base_connection import BaseConnection
 from netmiko.no_enable import NoEnable
+from netmiko import log
+
+from netmiko.exceptions import (
+    ReadException,
+    ReadTimeout,
+)
+
+import warnings
 
 
 class AudiocodeBase(BaseConnection):
@@ -166,7 +174,7 @@ class AudiocodeBase(BaseConnection):
 send_config_set() for the Audiocode drivers require that you specify the
 config_mode_command. For example, config_mode_command="configure system"
 (or "configure voip" or "configure network" etc.)
-            """
+			"""
             raise ValueError(msg)
         return super().send_config_set(
             config_commands=config_commands,
@@ -347,6 +355,17 @@ class Audiocode66Telnet(AudiocodeBase66):
 
 class AudiocodeShellBase(NoEnable, AudiocodeBase):
     """Audiocode this applies to 6.6 Audiocode Firmware versions that only use the Shell."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if kwargs.get("global_cmd_verify") is None:
+            kwargs["global_cmd_verify"] = False
+        if kwargs.get("global_paging_disabled") is None:
+            kwargs["global_paging_disabled"] = True
+        if kwargs.get("global_paging_pattern") is None:
+            kwargs["global_paging_pattern"] = "-- More --"
+        if kwargs.get("global_paging_continue") is None:
+            kwargs["global_paging_continue"] = "\r"
+        return super().__init__(*args, **kwargs)
 
     def session_preparation(self) -> None:
         """Prepare the session after the connection has been established."""

@@ -1,6 +1,7 @@
 from typing import Any, Optional
 import re
 from netmiko.cisco_base_connection import CiscoBaseConnection
+from netmiko.exceptions import NetmikoTimeoutException
 
 
 class AdtranOSBase(CiscoBaseConnection):
@@ -8,7 +9,7 @@ class AdtranOSBase(CiscoBaseConnection):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         if kwargs.get("global_cmd_verify") is None:
-            kwargs["global_cmd_verify"] = False
+            kwargs["global_cmd_verify"] = True
         return super().__init__(*args, **kwargs)
 
     def session_preparation(self) -> None:
@@ -27,17 +28,52 @@ class AdtranOSBase(CiscoBaseConnection):
         self,
         cmd: str = "enable",
         pattern: str = "ssword",
-        enable_pattern: Optional[str] = None,
+        enable_pattern: Optional[str] = "Falling back",
         check_state: bool = True,
         re_flags: int = re.IGNORECASE,
     ) -> str:
-        return super().enable(
-            cmd=cmd,
-            pattern=pattern,
-            enable_pattern=enable_pattern,
-            check_state=check_state,
-            re_flags=re_flags,
+        output = ""
+        msg = (
+            "Failed to enter enable mode. Please ensure you pass "
+            "the 'secret' argument to ConnectHandler."
         )
+
+        # Check if in enable mode already.
+        if check_state and self.check_enable_mode():
+            return output
+
+        # Send "enable" mode command
+        self.write_channel(self.normalize_cmd(cmd))
+        try:
+            # Read the command echo
+            if self.global_cmd_verify is not False:
+                output += self.read_until_pattern(pattern=re.escape(cmd.strip()))
+
+            # Search for trailing prompt or password pattern
+            output += self.read_until_prompt_or_pattern(
+                pattern=pattern, re_flags=re_flags
+            )
+
+            # Send the "secret" in response to password pattern
+            if re.search(pattern, output):
+                self.write_channel(self.normalize_cmd(self.secret))
+                output += self.read_until_prompt_or_pattern(
+                    pattern=str(enable_pattern), re_flags=re_flags
+                )
+
+            # Search for terminating pattern if defined
+            if enable_pattern and re.search(enable_pattern, output):
+                # Added 2nd attempt in case of fallback to local Authentication
+                self.write_channel(self.normalize_cmd(self.secret))
+                output += self.read_until_prompt()
+            else:
+                if not self.check_enable_mode():
+                    raise ValueError(msg)
+
+        except NetmikoTimeoutException:
+            raise ValueError(msg)
+
+        return output
 
     def exit_enable_mode(self, exit_command: str = "disable") -> str:
         return super().exit_enable_mode(exit_command=exit_command)

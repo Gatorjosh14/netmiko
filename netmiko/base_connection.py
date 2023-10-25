@@ -28,6 +28,7 @@ import io
 import re
 import socket
 import telnetlib
+import telnet_proxy
 import time
 from collections import deque
 from os import path
@@ -144,6 +145,9 @@ class BaseConnection:
         verbose: bool = False,
         global_delay_factor: float = 1.0,
         global_cmd_verify: Optional[bool] = None,
+        global_paging_disabled: Optional[bool] = None,
+        global_paging_pattern: Optional[str] = None,
+        global_paging_continue: Optional[str] = None,
         use_keys: bool = False,
         key_file: Optional[str] = None,
         pkey: Optional[paramiko.PKey] = None,
@@ -356,6 +360,9 @@ class BaseConnection:
         self._legacy_mode = _legacy_mode
         self.global_delay_factor = global_delay_factor
         self.global_cmd_verify = global_cmd_verify
+        self.global_paging_disabled = global_paging_disabled
+        self.global_paging_pattern = global_paging_pattern
+        self.global_paging_continue = global_paging_continue
         if self.fast_cli and self.global_delay_factor == 1:
             self.global_delay_factor = 0.1
         self.session_log = None
@@ -712,6 +719,11 @@ results={results}
                     self._read_buffer += buffer
                 log.debug(f"Pattern found: {pattern} {output}")
                 return output
+            
+            if self.global_paging_disabled:
+                if re.search(self.global_paging_pattern, output, flags=re_flags):
+                    self.write_channel(self.global_paging_continue)
+
             time.sleep(loop_delay)
 
         msg = f"""\n\nPattern not detected: {repr(pattern)} in output.
@@ -1088,9 +1100,17 @@ You can look at the Netmiko session_log or debug log for more information.
         """
         self.channel: Channel
         if self.protocol == "telnet":
-            self.remote_conn = telnetlib.Telnet(
-                self.host, port=self.port, timeout=self.timeout
-            )
+            if self.sock:
+                self.remote_conn = telnet_proxy.Telnet(
+                    self.host,
+                    port=self.port,
+                    timeout=self.timeout,
+                    proxy_dict=self.sock,
+                )
+            else:
+                self.remote_conn = telnetlib.Telnet(
+                    self.host, port=self.port, timeout=self.timeout
+                )
             # Migrating communication to channel class
             self.channel = TelnetChannel(conn=self.remote_conn, encoding=self.encoding)
             self.telnet_login()
