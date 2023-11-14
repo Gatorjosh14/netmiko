@@ -7,11 +7,6 @@ from netmiko.exceptions import NetmikoTimeoutException
 class AdtranOSBase(CiscoBaseConnection):
     prompt_pattern = r"[>#]"
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        if kwargs.get("global_cmd_verify") is None:
-            kwargs["global_cmd_verify"] = True
-        return super().__init__(*args, **kwargs)
-
     def session_preparation(self) -> None:
         """Prepare the session after the connection has been established."""
         self.ansi_escape_codes = True
@@ -28,7 +23,7 @@ class AdtranOSBase(CiscoBaseConnection):
         self,
         cmd: str = "enable",
         pattern: str = "ssword",
-        enable_pattern: Optional[str] = "Falling back",
+        enable_pattern: Optional[str] = None,
         check_state: bool = True,
         re_flags: int = re.IGNORECASE,
     ) -> str:
@@ -57,15 +52,21 @@ class AdtranOSBase(CiscoBaseConnection):
             # Send the "secret" in response to password pattern
             if re.search(pattern, output):
                 self.write_channel(self.normalize_cmd(self.secret))
-                output += self.read_until_prompt_or_pattern(
-                    pattern=str(enable_pattern), re_flags=re_flags
+
+                # Handle the fallback to local authentication case
+                fallback_pattern = r"Falling back"
+                new_output = self.read_until_prompt_or_pattern(
+                    pattern=fallback_pattern, re_flags=re_flags
                 )
+                output += new_output
+
+                if "Falling back" in new_output:
+                    self.write_channel(self.normalize_cmd(self.secret))
+                    output += self.read_until_prompt()
 
             # Search for terminating pattern if defined
-            if enable_pattern and re.search(enable_pattern, output):
-                # Added 2nd attempt in case of fallback to local Authentication
-                self.write_channel(self.normalize_cmd(self.secret))
-                output += self.read_until_prompt()
+            if enable_pattern and not re.search(enable_pattern, output):
+                output += self.read_until_pattern(pattern=enable_pattern)
             else:
                 if not self.check_enable_mode():
                     raise ValueError(msg)
