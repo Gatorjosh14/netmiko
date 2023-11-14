@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     SOCKS_SUPPORTED = False
 
 
-class TelnetProxy(telnetlib.Telnet):
+class Telnet(telnetlib.Telnet):
     def __init__(
         self,
         host: Optional[str] = None,
